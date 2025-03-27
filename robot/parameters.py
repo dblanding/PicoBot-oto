@@ -8,3 +8,6 @@ TURN_SPD = 30_000
 
 # ratio of spd to joystick value
 JS_GAIN = 2
+
+# threshold min distance (m) to detect motion has occurred
+MIN_DIST = 0.002

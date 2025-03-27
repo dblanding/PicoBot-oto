@@ -12,16 +12,16 @@ MicroPython code for PicoBot project
     * initially (0, 0, 0)
     * x & y units: meters
     * heading units: radians, Zero along X-axis, pos CCW, neg CW
-* distance sensor units: mm converted to meters
+* distance sensor units: mm (gets converted to meters in mapper)
 """
 
 import asyncio
 import gc
 import json
 from machine import I2C, Pin, UART
-from math import pi
+from math import pi, sqrt
 import motors
-from parameters import JS_GAIN
+from parameters import JS_GAIN, MIN_DIST
 import qwiic_i2c
 import qwiic_otos
 import struct
@@ -125,6 +125,18 @@ def get_pose():
     pose = myOtos.getPosition()
     return (pose.x, pose.y, pose.h)
 
+def bot_moving(pose0, pose1):
+    """Detect if bot has moved more than MIN_DIST from pose0 to pose1"""
+    x0, y0, h0 = pose0
+    x1, y1, h1 = pose1
+    d = sqrt((x0 - x1)**2 + (y0 - y1)**2)
+    return d > MIN_DIST
+
+def check_pose(prev_pose):
+    curr_pose = get_pose()
+    is_moving = bot_moving(prev_pose, curr_pose)
+    return (is_moving, curr_pose)
+
 def send_json(data):
     uart1.write((json.dumps(data) + "\n").encode())
 
@@ -146,6 +158,7 @@ class Robot():
         self.run = True
         self.mode = 'T'  # 'T' for tele-op, 0 for S&R pattern
         self.errors = []
+        self.prev_pose = (0, 0, 0)
 
     def stop(self):
         self.run = False
@@ -160,8 +173,9 @@ class Robot():
                 dist_R = get_dist(b'\x04')
                 dist_F = tof1.read()
 
-                # get current pose
-                pose = get_pose()
+                # check current pose
+                is_moving, pose = check_pose(self.prev_pose)
+                self.prev_pose = pose
                 print(pose, dist_L, dist_R, dist_F)
 
                 # Drive in tele-op mode
@@ -184,8 +198,8 @@ class Robot():
                         # send commands to motors
                         motors.drive_motors(self.lin_spd, self.ang_spd)
 
-                # send robot data to laptop
-                if pose != (0, 0, 0):
+                # If robot is moving, send robot data to laptop
+                if is_moving:
                     send_json({
                         "pose": list(pose),
                         "dist_L": dist_L,
