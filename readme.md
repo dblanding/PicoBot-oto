@@ -1,19 +1,24 @@
 # PicoBot with Optical Tracking Odometry
-* This project describes the use of SparkFun's recently introduced [Optical Tracking Odometry Sensor (OTOS)](https://www.sparkfun.com/sparkfun-optical-tracking-odometry-sensor-paa5160e1-qwiic.html) to
-replace the wheel odometry system that relies on using motor encoders and an IMU.
-* The robot used is the PicoBot described in this [earlier project](https://github.com/dblanding/PicoBot-dev).
 * I have long wondered if optical flow technology could be used to replace wheel odometry but I have never gotten around to undertaking the project. Well, it turns out this sensor was worth the wait because it works very well on the laminated vinyl flooring throughout my house.
+* This project describes the use of SparkFun's recently introduced [Optical Tracking Odometry Sensor (OTOS)](https://www.sparkfun.com/sparkfun-optical-tracking-odometry-sensor-paa5160e1-qwiic.html) to
+replace the wheel odometry system I have been using, which relies on using motor encoders and an IMU.
+* The robot used is the PicoBot described in this [earlier project](https://github.com/dblanding/PicoBot-dev).
+
+![PicoBot](imgs/picobot.jpeg)
+![OTOS](imgs/otos.jpeg)
 
 ## Power to the Pico
-* Power is supplied to the Pico from 2 sources (one or the other or both at once):
+* Power is supplied to the Pico from multiple sources:
     1. Connected to a laptop by USB cable
-    2. Connected to an onboard 11.1V (3S) Lithium Polymer Battery 
+    2. Powered by an onboard battery
+    3. Both USB & battery at once
 
 ![Pico Power](imgs/pico_power_bb.png)
 
-* The Pico Vsys pin is intended to accept DC power in the range of 1.8V to 5.5V. It is connected to the 5V out pin on the L298N Motor Driver board through a **diode**.
-* If the Pico is connected to the laptop by USB cable, regardless of whether the onboard power switch is ON or OFF, the voltage at the Vsys pin is just a bit under 5 Volts.
-* If the Pico is *not* connected to the laptop, and the onboard power switch is ON, the voltage at the Vsys pin is still just a bit under 5 V.
+* When powered by a 5V source, care must be taken to connect the source to the VSYS pin (pin 39) through a Schottky diode.
+* Conveniently, the L298N Motor Driver board provides a 5V power supply.
+* If the Pico is connected to the laptop by USB cable, regardless of whether the battery switch is ON or OFF, the voltage at the Vsys pin is just a bit under 5 Volts.
+* If the Pico is *not* connected to the laptop, and the battery switch is ON, the voltage at the Vsys pin is still just a bit under 5 V.
 * In either case, the **diode** safely resolves any voltage conflicts on the Vsys pin and the Pico remains happily powered, putting out 3.3V on its 3V3 pin.
 
 ## Running the code:
@@ -23,12 +28,12 @@ replace the wheel odometry system that relies on using motor encoders and an IMU
 * To Operate the PicoBot:
     1. Place the PicoBot in its **Home** pose = (0, 0, 0) on the floor of the arena.
     2. Turn the PicoBot power switch **ON**. This starts the file `main.py` on the robot.
-    3. Open the Bluefruit Connect app on your cell phone.
+    3. Open the Bluefruit Connect cell phone app.
     
     ![bluefruit connect app](imgs/bluefruit_connect_app.png)
     
     * 2 BLE UART Friend devices will be listed, but you don't neccesarily know which device is on which uart.
-        * One is on UART0 and one is on UART1, both with a flashing red LED
+        * The one marked **0** is on UART0 and the one marked **1** is on UART1, both with a flashing red LED
     * Connect to the one on **UART0**
         * The connected device will now have a solid blue LED
         * If the UART1 device LED is lit, disconnect and click on the other one.
@@ -41,7 +46,7 @@ replace the wheel odometry system that relies on using motor encoders and an IMU
         * Sometimes, an `Error parsing JSON` will occur and the map doesn't get drawn.
         * If this happens, just run the file again.
         * When the window appears with a map of the Arena, click on the **Start** Button.
-        * Now the PicoBot is ready to go. (You might hear the motors sing briefly.)
+        * Now the PicoBot is ready to go. (The motors might sing briefly.)
     
 ![Empty Arena Map](imgs/arena_map0.png)
     
@@ -62,3 +67,8 @@ replace the wheel odometry system that relies on using motor encoders and an IMU
 ![Run #1](imgs/arena_map1.png)
     
 ![Run #2](imgs/arena_map2.png)
+
+My *Arena* is actually a room where my desk is located, and which has 2 doorways. This next map shows the path of the PicoBot starting at its home position, then driving across the room, out one of the doorways, through some adjacent rooms and back again to its starting point. The path of the PicoBot (Blue dots) shows an almost indistinguishable offset between the starting and ending points. This optical tracking odometer is really quite a remarkable device. There's no way my old wheel odometry system was this good.
+
+![Loop_run](imgs/loop_map.png)
+
