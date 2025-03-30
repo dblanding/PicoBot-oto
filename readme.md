@@ -68,7 +68,12 @@ replace the wheel odometry system I have been using, which relies on using motor
     
 ![Run #2](imgs/arena_map2.png)
 
-My *Arena* is actually a room where my desk is located, and which has 2 doorways. This next map shows the path of the PicoBot starting at its home position, then driving across the room, out one of the doorways, through some adjacent rooms and back again to its starting point. The path of the PicoBot (Blue dots) shows an almost indistinguishable offset between the starting and ending points. This optical tracking odometer is really quite a remarkable device. There's no way my old wheel odometry system was this good.
+My *Arena* is actually a room where my desk is located, and which has 2 doorways. This next map shows the path of the PicoBot starting at its home position, then driving across the room, out one of the doorways, through some adjacent rooms and back again to its starting point. The path of the PicoBot (Blue dots) shows its path from start at to finish.
+
+* Start pose: [0.01068115, 0.0, -0.05809947]
+* Finish pose: [0.0009155273, -0.1760864, -0.03528153]
+
+This optical tracking odometer is really quite a remarkable device. There's no way my old wheel odometry system was this good.
 
 ![Loop_run](imgs/loop_map.png)
 
