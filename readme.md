@@ -21,6 +21,15 @@ replace the wheel odometry system I have been using, which relies on using motor
 * If the Pico is *not* connected to the laptop, and the battery switch is ON, the voltage at the Vsys pin is still just a bit under 5 V.
 * In either case, the **diode** safely resolves any voltage conflicts on the Vsys pin and the Pico remains happily powered, putting out 3.3V on its 3V3 pin.
 
+## PicoBot CAD model
+* It's not essential to have a CAD model but it can be helpful when developing and exploring alternative configurations. Here is a link to the [PicoBot CAD model](https://cad.onshape.com/documents/a467fa491507e4344e74773f/w/043eb7e17b7f56857aab3bce/e/99ec965689b12d56fb1745f2?renderMode=0&uiState=67ea6e95b2830f7d101d11e2), showing some of the critical components in the actual physical PicoBot.
+
+## Mounting the OTO Sensor
+* SparkFun recommends the Sensor be set to have a working range of 10 - 27 mm, and that for FTC it be set at exactly 10 mm.
+* I have the gap set at about 12 mm on the PicoBot and it seems to work very well.
+
+![OTO Sensor gap](imgs/otos-gap.png)
+
 ## Running the code:
 * The [robot folder](robot) contains files that are run on the Pico
 * The [laptop folder](laptop) contains files that are run on the laptop
@@ -68,7 +77,7 @@ replace the wheel odometry system I have been using, which relies on using motor
     
 ![Run #2](imgs/arena_map2.png)
 
-My *Arena* is actually a room where my desk is located, and which has 2 doorways. This next map shows the path of the PicoBot starting at its home position, then driving across the room, out one of the doorways, through some adjacent rooms and back again to its starting point. The path of the PicoBot (Blue dots) shows its path from start at to finish.
+My *Arena* is actually a room where my desk is located, and which has 2 doorways. This next map shows the path of the PicoBot starting at its home position, then driving across the room, out one of the doorways, through some adjacent rooms and back again to its starting point. The trail of Blue dots shows the PicoBot's path from start to finish.
 
 * Start pose: [0.01068115, 0.0, -0.05809947]
 * Finish pose: [0.0009155273, -0.1760864, -0.03528153]
