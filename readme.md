@@ -22,7 +22,7 @@ replace the wheel odometry system I have been using, which relies on using motor
 * In either case, the **diode** safely resolves any voltage conflicts on the Vsys pin and the Pico remains happily powered, putting out 3.3V on its 3V3 pin.
 
 ## PicoBot CAD model
-* It's not essential to have a CAD model but it can be helpful when developing and exploring alternative configurations. Here is a link to the [PicoBot CAD model](https://cad.onshape.com/documents/a467fa491507e4344e74773f/w/ba0afe661856bb450bf6a220/e/833b2810e351b814296b3291?renderMode=0&uiState=67ec606d799e52259c7ebbd8), showing some of the critical components in the actual physical PicoBot.
+* It's not essential to have a CAD model but it can be helpful when developing and exploring alternative configurations. Here is a link to the [PicoBot CAD model](https://cad.onshape.com/documents/a467fa491507e4344e74773f/w/ba0afe661856bb450bf6a220/e/833b2810e351b814296b3291?renderMode=0&uiState=67ec61ff799e52259c7ebdd3), showing some of the critical components in the actual physical PicoBot.
 
 ## Mounting the OTO Sensor
 * SparkFun recommends the Sensor be set to have a working range of 10 - 27 mm, and that for FTC it be set at exactly 10 mm.
