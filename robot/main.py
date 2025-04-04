@@ -12,6 +12,7 @@ MicroPython code for PicoBot project
     * initially (0, 0, 0)
     * x & y units: meters
     * heading units: radians, Zero along X-axis, pos CCW, neg CW
+    * yaw_rate (rad/sec) also used
 * distance sensor units: mm (gets converted to meters in mapper)
 """
 
@@ -21,13 +22,16 @@ import json
 from machine import I2C, Pin, UART
 from math import pi, sqrt
 import motors
-from parameters import JS_GAIN, MIN_DIST
+from parameters import JS_GAIN, MIN_DIST, ANGLE_TOL, SWATH_PITCH
+from parameters import P_TURN_GAIN, D_TURN_GAIN, MAX_ANG_SPD
 import qwiic_i2c
 import qwiic_otos
 import struct
 import time
 import VL53L0X
 import arena
+
+D_GAIN = 0.286  # Gain of Derivative feedback term
 
 # set up uart0 for communication with BLE UART friend
 print("setting up uart0 for accepting tele-op joystick commands")
@@ -137,6 +141,10 @@ def check_pose(prev_pose):
     is_moving = bot_moving(prev_pose, curr_pose)
     return (is_moving, curr_pose)
 
+def get_yaw_rate():
+    vel = myOtos.getVelocity()
+    return vel.h
+
 def send_json(data):
     uart1.write((json.dumps(data) + "\n").encode())
 
@@ -149,6 +157,7 @@ def read_json():
         print("Invalid data")
         return None
 
+
 class Robot():
     def __init__(self):
 
@@ -159,6 +168,51 @@ class Robot():
         self.mode = 'T'  # 'T' for tele-op, 0 for S&R pattern
         self.errors = []
         self.prev_pose = (0, 0, 0)
+
+    def auto(self):
+        """Set mode to drive autonomously."""
+        self.mode = 0
+
+    def tele(self):
+        """Set mode to drive by tele-operation."""
+        self.mode = 'T'
+
+    def turn(self, goal_angle, gz, yaw):
+        """
+        Return ang_spd needed to drive motors when
+        turning in place to goal_angle (radians).
+        self.ang_spd is used to remember prev ang_spd when stuck
+        """
+        # calculate ang_spd to steer to goal_angle
+        yaw_err = yaw - goal_angle
+        p = -(yaw_err * P_TURN_GAIN)  # proportional term
+        d = -(gz * D_TURN_GAIN)  # derivative term
+        ang_spd = p + d
+
+        # limit value of ang_spd
+        if ang_spd < -MAX_ANG_SPD:
+            ang_spd = -MAX_ANG_SPD
+        if ang_spd > MAX_ANG_SPD:
+            ang_spd = MAX_ANG_SPD
+
+        # reset self.ang_spd to zero if not stuck
+        if abs(gz) > 0.01:
+            self.ang_spd = 0
+
+        # check if turn is complete
+        if abs(gz) < 0.01 and abs(yaw_err) < ANGLE_TOL:
+            ang_spd = 0
+
+        # give an extra boost if needed to overcome static friction
+        elif abs(gz) < 0.01 and abs(yaw_err) < 3 * ANGLE_TOL:
+            if not self.ang_spd:  # not previously boosted
+                ang_spd *= 1.5
+                self.ang_spd = ang_spd
+            else:  # boost it further
+                ang_spd = self.ang_spd * 1.5
+                self.ang_spd = 0
+
+        return ang_spd
 
     def stop(self):
         self.run = False
@@ -176,7 +230,10 @@ class Robot():
                 # check current pose
                 is_moving, pose = check_pose(self.prev_pose)
                 self.prev_pose = pose
-                print(pose, dist_L, dist_R, dist_F)
+                
+                # get yaw (radians) and yaw rate (rad/sec)
+                _, _, yaw = pose
+                gz = get_yaw_rate()
 
                 # Drive in tele-op mode
                 if self.mode == 'T':
@@ -197,6 +254,123 @@ class Robot():
 
                         # send commands to motors
                         motors.drive_motors(self.lin_spd, self.ang_spd)
+
+                # Drive autonomous back & forth "S & R" pattern
+                elif self.mode == 0:
+                    # suppress distance values while turning
+                    dist_L = 2000
+                    dist_R = 2000
+                    dist_F = 2000
+
+                    # turn in place to face -Y direction
+                    goal_angle = -pi/2
+                    ang_spd = self.turn(goal_angle, gz, yaw)
+                    motors.drive_motors(0, ang_spd)
+
+                    # until turn is complete
+                    if ang_spd == 0:
+                        self.mode = 1
+
+                elif self.mode == 1:
+                    # drive -y direction, steering to goal_angle
+                    p = -(yaw - goal_angle)  # proportional term
+                    d = -(gz * D_GAIN)  # derivative term
+                    ang_spd = p + d
+                    motors.drive_motors(self.lin_spd, ang_spd)
+
+                    # stop
+                    if pose[1] < -1.3:  # dist_F < 500:
+                        motors.drive_motors(0, 0)
+                        self.mode = 2
+
+                elif self.mode == 2:
+                    # turn to face +X direction
+                    goal_angle = 0
+
+                    # suppress distance values while turning
+                    dist_L = 2000
+                    dist_R = 2000
+                    dist_F = 2000
+
+                    # turn in place to goal angle
+                    ang_spd = self.turn(goal_angle, gz, yaw)
+                    motors.drive_motors(0, ang_spd)
+
+                    # when turn is complete
+                    if ang_spd == 0:
+                        pose = get_pose()
+                        next_swath = pose[0] + SWATH_PITCH
+                        self.mode = 3
+
+                elif self.mode == 3:
+                    # jog +X direction to next swath
+                    p = -(yaw - goal_angle)  # proportional term
+                    d = -(gz * D_GAIN)  # derivative term
+                    ang_spd = p + d
+                    motors.drive_motors(self.lin_spd, ang_spd)
+
+                    # stop at next_swath
+                    if pose[0] >= next_swath:
+                        motors.drive_motors(0, 0)
+                        self.mode = 4
+
+                elif self.mode == 4:
+                    # suppress distance values while turning
+                    dist_L = 2000
+                    dist_R = 2000
+                    dist_F = 2000
+
+                    # turn in place to face +Y direction
+                    goal_angle = pi/2
+                    ang_spd = self.turn(goal_angle, gz, yaw)
+                    motors.drive_motors(0, ang_spd)
+
+                    # until turn is complete
+                    if ang_spd == 0:
+                        self.mode = 5
+
+                elif self.mode == 5:
+                    # drive +y direction, steering to goal angle
+                    p = -(yaw - goal_angle)  # proportional term
+                    d = -(gz * D_GAIN)  # derivative term
+                    ang_spd = p + d
+                    motors.drive_motors(self.lin_spd, ang_spd)
+
+                    # stop
+                    if dist_F < 500:
+                        motors.drive_motors(0, 0)
+                        self.mode = 6
+
+                elif self.mode == 6:
+                    # turn right 90 deg
+                    goal_angle = 0
+
+                    # suppress distance values while turning
+                    dist_L = 2000
+                    dist_R = 2000
+                    dist_F = 2000
+
+                    # turn in place to goal angle
+                    ang_spd = self.turn(goal_angle, gz, yaw)
+                    motors.drive_motors(0, ang_spd)
+
+                    # when turn is complete
+                    if ang_spd == 0:
+                        pose = get_pose()
+                        next_swath = pose[0] + SWATH_PITCH
+                        self.mode = 7
+
+                elif self.mode == 7:
+                    # jog +x to next swath
+                    p = -(yaw - goal_angle)  # proportional term
+                    d = -(gz * D_GAIN)  # derivative term
+                    ang_spd = p + d
+                    motors.drive_motors(self.lin_spd, ang_spd)
+
+                    # stop at next_swath
+                    if pose[0] >= next_swath:
+                        motors.drive_motors(0, 0)
+                        self.mode = 0
 
                 # If robot is moving, send robot data to laptop
                 if is_moving:
