@@ -1,7 +1,11 @@
 # motors.py
 
-from machine import Pin, PWM
+from machine import Pin, PWM, ADC
 from parameters import FULL_SPD, TURN_SPD
+
+# set up ADC Pin for potentiometer input
+potentiometer_pin = Pin(26, Pin.IN)
+adc = ADC(potentiometer_pin)
 
 # setup pins connected to L298N Motor Drive Controller Board
 ena = PWM(Pin(21))
@@ -13,6 +17,14 @@ enb = PWM(Pin(16))
 
 ena.freq(1_000)
 enb.freq(1_000)
+
+def get_trim_pot_val():
+    """Read pot, return value in range -0.1 to +0.1"""
+    
+    pot_value = adc.read_u16()
+    # convert to value between -0.1 to +0.1
+    trim = (0.5 - pot_value / 65_536) / 5
+    return trim
 
 def set_mtr_dirs(a_mode, b_mode):
     """Set motor direction pins for both motors.
@@ -62,13 +74,18 @@ def drive_motors(lin_spd, ang_spd):
     Based on robot's desired motion in 2 DOF:
     linear speed: lin_spd (in range -1 to +1)
     angular speed: ang_spd (in range -1 to +1)
-    Calculate both motor speeds and
-    drive motors accordingly.
+    Calculate both motor speeds and drive motors accordingly.
+    
+    Use potentiometer value to null out robot's tendency to
+    veer to the right or left instead of straight ahead.
     """
     
+    # get trim value
+    trim = get_trim_pot_val()
+    
     # linear components
-    a_lin_spd = int(FULL_SPD * lin_spd)
-    b_lin_spd = int(FULL_SPD * lin_spd)
+    a_lin_spd = int(FULL_SPD * lin_spd * (1 + trim))
+    b_lin_spd = int(FULL_SPD * lin_spd * (1 - trim))
     
     # turning components
     a_ang_spd = int(TURN_SPD * ang_spd)
