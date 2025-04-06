@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 import json
 from pprint import pprint
 import numpy as np
@@ -37,12 +38,21 @@ class RobotDisplay:
             line, self.buffer = self.buffer.split("\n", 1)
             # print(f"Received data: {line}")
             try:
+                # Print current time w/ seconds to 2 decimals
+                now = datetime.now()
+                current_time = now.strftime("%H:%M:%S.%f")[:-4]
+                print(current_time)
+
+                # Print data from robot
                 message = json.loads(line)
                 pprint(message)
             except ValueError:
                 print("Error parsing JSON")
                 return
             if "arena" in message:
+                # print date and time
+                now = datetime.now()
+                print("Run started:", now)
                 self.arena = message
             if "pose" in message:
                 pose = message["pose"]
