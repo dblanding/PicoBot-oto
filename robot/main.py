@@ -20,7 +20,7 @@ import asyncio
 import gc
 import json
 from machine import I2C, Pin, UART
-from math import pi, sqrt
+from math import pi, sqrt, atan2, sin, cos
 import motors
 from parameters import JS_GAIN, MIN_DIST, ANGLE_TOL, SWATH_PITCH
 from parameters import P_TURN_GAIN, D_TURN_GAIN, MAX_ANG_SPD
@@ -31,7 +31,9 @@ import time
 import VL53L0X
 import arena
 
-D_GAIN = 0.286  # Gain of Derivative feedback term
+D_GAIN = 0.5  # Gain of Derivative feedback term
+
+waypoints_file = "waypoints.txt"
 
 # set up uart0 for communication with BLE UART friend
 print("setting up uart0 for accepting tele-op joystick commands")
@@ -111,6 +113,18 @@ myOtos.resetTracking()
 
 print("OTOS initialized")
 
+def read_waypoints(wp_file):
+    """Load waypoints from file"""
+    waypoints = []
+    with open(wp_file) as f:
+        lines = f.readlines()
+        for line in lines:
+            if ',' in line:
+                str_x, str_y = line.split(',')
+                wp = float(str_x), float(str_y)
+                waypoints.append(wp)
+    return waypoints
+
 def get_dist(channel):
     """
     return dist (mm) from tof sensor on mux
@@ -157,6 +171,49 @@ def read_json():
         print("Invalid data")
         return None
 
+# geometry helper functions
+def p2r(r, theta):
+    """Convert polar coords to rectangular"""
+    x = cos(theta) * r
+    y = sin(theta) * r
+    return (x, y)
+
+def r2p(x, y):
+    """Convert rectangular coords to polar"""
+    r = sqrt(x*x + y*y)
+    theta = atan2(y, x)
+    return (r, theta)
+
+def rel_polar_coords_to_pt(curr_pose, point):
+    """Based on current pose, return relative
+    polar coords dist (m), angle (rad) to goal point.
+    """
+    # current pose
+    x0, y0, a0 = curr_pose
+
+    # coords of goal point
+    x1, y1 = point
+
+    # Relative coords to goal point
+    x = x1 - x0
+    y = y1 - y0
+
+    # Convert rectangular coords to polar
+    r, theta = r2p(x, y)
+
+    # Relative angle to goal point
+    rel_angle = theta - a0
+
+    # ensure angle is between -pi/2 and +pi/2
+    if rel_angle < -pi:
+        rel_angle += 2 * pi
+    elif rel_angle > pi:
+        rel_angle -= 2 * pi
+
+    return (r, rel_angle)
+
+# read waypoints file
+waypoints = read_waypoints(waypoints_file)
 
 class Robot():
     def __init__(self):
@@ -165,9 +222,10 @@ class Robot():
         self.lin_spd = 0.4  # nominal drive speed
         self.ang_spd = 0  # prev value ang_spd only when stuck
         self.run = True
-        self.mode = 'T'  # 'T' for tele-op, 0 for S&R pattern
+        self.mode = 'W'  # 'W' for waypoints, 'T' for Tele-op, 0 for S&R pattern
         self.errors = []
         self.prev_pose = (0, 0, 0)
+        self.wp_idx = 0  # index of first waypoint
 
     def auto(self):
         """Set mode to drive autonomously."""
@@ -221,7 +279,6 @@ class Robot():
     async def main(self):
         try:
             while self.run:
-                
                 # read distances from VCSEL sensors
                 dist_L = get_dist(b'\x02')
                 dist_R = get_dist(b'\x04')
@@ -255,6 +312,23 @@ class Robot():
                         # send commands to motors
                         motors.drive_motors(self.lin_spd, self.ang_spd)
 
+                # Drive autonomously to sequence of waypoints
+                elif self.mode == 'W':
+
+                    wp = waypoints[self.wp_idx]
+                    goal_dist, goal_angle = rel_polar_coords_to_pt(pose, wp)
+                    if goal_dist > 0.2:
+                        # drive to waypoint, steering to goal_angle
+                        d = -(gz * D_GAIN)  # derivative term
+                        ang_spd = goal_angle + d
+                        motors.drive_motors(self.lin_spd, ang_spd)
+                    else:
+                        # arrived at waypoint
+                        self.wp_idx += 1
+                        if self.wp_idx == len(waypoints):
+                            # No more waypoints
+                            self.stop()
+
                 # Drive autonomous back & forth "S & R" pattern
                 elif self.mode == 0:
                     # suppress distance values while turning
@@ -274,7 +348,7 @@ class Robot():
                 elif self.mode == 1:
                     # drive -y direction, steering to goal_angle
                     p = -(yaw - goal_angle)  # proportional term
-                    d = -(gz * D_GAIN)  # derivative term
+                    d = (gz * D_GAIN)  # derivative term
                     ang_spd = p + d
                     motors.drive_motors(self.lin_spd, ang_spd)
 
@@ -380,6 +454,8 @@ class Robot():
                         "dist_R": dist_R,
                         "dist_F": dist_F,
                         "errors": self.errors,
+                        "goal_dist": goal_dist,
+                        "goal_angle": goal_angle,
                         })
 
                 led.toggle()
