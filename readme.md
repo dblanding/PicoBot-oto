@@ -51,17 +51,20 @@ replace the wheel odometry system I have been using, which relies on using motor
     * Lay the phone down on a horizontal surface and click **Accelerometer**
     4. On the laptop, run the file `display_from_robot.py`.
     * It's important to have the phone app already connected so the laptop has no other choice but to connect to the device on UART1.
-    * A window will be launched with a map of the Arena and some Buttons across the top.
+    * Hopefully, a window will be launched with a map of the Arena with some waypoints plotted in Magenta. Also, some buttons will be displayed across the top.
         * Sometimes, an `Error parsing JSON` will occur and the map doesn't get drawn.
-        * If this happens, just run the file again.
-        * When the window appears with a map of the Arena, click on the **Start** Button.
+        * If this happens, just exit and run the file again.
+        * Make sure the phone is connected to the bluetooth module on UART0 and the laptop program is connected to the one on UART1.
+    * When the window appears with a map of the Arena (and the waypoints plotted in Magenta), you're ready to proceed to the next step.
+    
+![Empty Arena Map](imgs/start_map.png)
+    
+## Driving the car in Tele-Op mode.
+* After completing steps 1 through 4 above...
+     * Cick on the **Tele** button to enable Tele-op driving mode.
         * Now the PicoBot is ready to go. (The motors might sing briefly.)
-    
-![Empty Arena Map](imgs/arena_map0.png)
-    
-## Driving the car.
-* **Carefully** pick up the phone, trying to keep it level.
-* Drive the car by tipping and tilting the phone.
+* Pick up the phone, being careful to keep it level..
+* The PicoBot is driven and steered by tipping and tilting the phone.
     * Imagine there is a small ball on the face of the phone.
     * Tipping the phone so the ball rolls away from you (toward the top) causes the robot to drive forward.
     * Tilting the phone to the right or left causes the robot to turn right or left.
@@ -71,18 +74,17 @@ replace the wheel odometry system I have been using, which relies on using motor
     * Red dots show the location of objects detected by the left distance sensor.
     * Green dots show the location of objects detected by the right distance sensor.
     * Yellow dots show the location of objects detected by the forward looking sensor.
-* If everything is working perfectly, the Red, Green and Yellow dots will fall into place on the black lines of the Arena map.
 
-![Run #1](imgs/arena_map1.png)
-    
-![Run #2](imgs/arena_map2.png)
+### Nulling any tendency to veer to the right or left
+* Test to make sure that when the phone is carefully tipped forward with no tilting to either side, the robot does indeed drive straight ahead without any tendency to veer to the right or left.
+    * A good way to do this is to start with the phone laying flat on a level table top, then carefully lift the bottom edge of the phone, while keeping the entire top edge in contact with the table. 
+* You can null out any tendency to veer by adjusting the trim pot connected to the Pico's analog input (Pin 26). This adjustment has the effect of changing the relative magnitude of the signals sent to the R & L motors.
 
-My *Arena* is actually a room where my desk is located, and which has 2 doorways. This next map shows the path of the PicoBot starting at its home position, then driving across the room, out one of the doorways, through some adjacent rooms and back again to its starting point. The trail of Blue dots shows the PicoBot's path from start to finish.
-
-* Start pose: [0.01068115, 0.0, -0.05809947]
-* Finish pose: [0.0009155273, -0.1760864, -0.03528153]
-
-This optical tracking odometer is really quite a remarkable device. There's no way my old wheel odometry system was this good.
+## Driving the car in Auto mode
+* Once the veering adjustment is made, the PicoBot can be driven in Auto mode  (automatically follow a series of waypoints).
+* Start by repeating steps 1 - 4 in the **Running the Code** section above.
+* This time, Click on the **Auto** button at the top of the map window.
+* If everything is working perfectly, the robot will proceed to drive through the series of waypoints, mapping any obstacles detected along the way, ultimately arriving at the last waypoint, which happens to be its home (starting) position.
 
 ![Loop_run](imgs/loop_map.png)
 
