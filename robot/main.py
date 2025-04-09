@@ -222,14 +222,14 @@ class Robot():
         self.lin_spd = 0.4  # nominal drive speed
         self.ang_spd = 0  # prev value ang_spd only when stuck
         self.run = True
-        self.mode = 'W'  # 'W' for waypoints, 'T' for Tele-op, 0 for S&R pattern
+        self.mode = 'W'  # 'T' for tele-op, 'W' for auto (waypoints) 
         self.errors = []
         self.prev_pose = (0, 0, 0)
         self.wp_idx = 0  # index of first waypoint
 
     def auto(self):
-        """Set mode to drive autonomously."""
-        self.mode = 0
+        """Set mode to drive auto follow waypoints."""
+        self.mode = 'W'
 
     def tele(self):
         """Set mode to drive by tele-operation."""
@@ -329,134 +329,26 @@ class Robot():
                             # No more waypoints
                             self.stop()
 
-                # Drive autonomous back & forth "S & R" pattern
-                elif self.mode == 0:
-                    # suppress distance values while turning
-                    dist_L = 2000
-                    dist_R = 2000
-                    dist_F = 2000
-
-                    # turn in place to face -Y direction
-                    goal_angle = -pi/2
-                    ang_spd = self.turn(goal_angle, gz, yaw)
-                    motors.drive_motors(0, ang_spd)
-
-                    # until turn is complete
-                    if ang_spd == 0:
-                        self.mode = 1
-
-                elif self.mode == 1:
-                    # drive -y direction, steering to goal_angle
-                    p = -(yaw - goal_angle)  # proportional term
-                    d = (gz * D_GAIN)  # derivative term
-                    ang_spd = p + d
-                    motors.drive_motors(self.lin_spd, ang_spd)
-
-                    # stop
-                    if pose[1] < -1.3:  # dist_F < 500:
-                        motors.drive_motors(0, 0)
-                        self.mode = 2
-
-                elif self.mode == 2:
-                    # turn to face +X direction
-                    goal_angle = 0
-
-                    # suppress distance values while turning
-                    dist_L = 2000
-                    dist_R = 2000
-                    dist_F = 2000
-
-                    # turn in place to goal angle
-                    ang_spd = self.turn(goal_angle, gz, yaw)
-                    motors.drive_motors(0, ang_spd)
-
-                    # when turn is complete
-                    if ang_spd == 0:
-                        pose = get_pose()
-                        next_swath = pose[0] + SWATH_PITCH
-                        self.mode = 3
-
-                elif self.mode == 3:
-                    # jog +X direction to next swath
-                    p = -(yaw - goal_angle)  # proportional term
-                    d = -(gz * D_GAIN)  # derivative term
-                    ang_spd = p + d
-                    motors.drive_motors(self.lin_spd, ang_spd)
-
-                    # stop at next_swath
-                    if pose[0] >= next_swath:
-                        motors.drive_motors(0, 0)
-                        self.mode = 4
-
-                elif self.mode == 4:
-                    # suppress distance values while turning
-                    dist_L = 2000
-                    dist_R = 2000
-                    dist_F = 2000
-
-                    # turn in place to face +Y direction
-                    goal_angle = pi/2
-                    ang_spd = self.turn(goal_angle, gz, yaw)
-                    motors.drive_motors(0, ang_spd)
-
-                    # until turn is complete
-                    if ang_spd == 0:
-                        self.mode = 5
-
-                elif self.mode == 5:
-                    # drive +y direction, steering to goal angle
-                    p = -(yaw - goal_angle)  # proportional term
-                    d = -(gz * D_GAIN)  # derivative term
-                    ang_spd = p + d
-                    motors.drive_motors(self.lin_spd, ang_spd)
-
-                    # stop
-                    if dist_F < 500:
-                        motors.drive_motors(0, 0)
-                        self.mode = 6
-
-                elif self.mode == 6:
-                    # turn right 90 deg
-                    goal_angle = 0
-
-                    # suppress distance values while turning
-                    dist_L = 2000
-                    dist_R = 2000
-                    dist_F = 2000
-
-                    # turn in place to goal angle
-                    ang_spd = self.turn(goal_angle, gz, yaw)
-                    motors.drive_motors(0, ang_spd)
-
-                    # when turn is complete
-                    if ang_spd == 0:
-                        pose = get_pose()
-                        next_swath = pose[0] + SWATH_PITCH
-                        self.mode = 7
-
-                elif self.mode == 7:
-                    # jog +x to next swath
-                    p = -(yaw - goal_angle)  # proportional term
-                    d = -(gz * D_GAIN)  # derivative term
-                    ang_spd = p + d
-                    motors.drive_motors(self.lin_spd, ang_spd)
-
-                    # stop at next_swath
-                    if pose[0] >= next_swath:
-                        motors.drive_motors(0, 0)
-                        self.mode = 0
-
                 # If robot is moving, send robot data to laptop
                 if is_moving:
-                    send_json({
-                        "pose": list(pose),
-                        "dist_L": dist_L,
-                        "dist_R": dist_R,
-                        "dist_F": dist_F,
-                        "errors": self.errors,
-                        "goal_dist": goal_dist,
-                        "goal_angle": goal_angle,
-                        })
+                    if self.mode == 'W':
+                        send_json({
+                            "pose": list(pose),
+                            "dist_L": dist_L,
+                            "dist_R": dist_R,
+                            "dist_F": dist_F,
+                            "errors": self.errors,
+                            "goal_dist": goal_dist,
+                            "goal_angle": goal_angle,
+                            })
+                    elif self.mote == 'T':
+                        send_json({
+                            "pose": list(pose),
+                            "dist_L": dist_L,
+                            "dist_R": dist_R,
+                            "dist_F": dist_F,
+                            "errors": self.errors,
+                            })
 
                 led.toggle()
                 await asyncio.sleep(0.1)
