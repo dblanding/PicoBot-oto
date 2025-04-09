@@ -1,3 +1,4 @@
+import arena
 import asyncio
 from datetime import datetime
 import json
@@ -17,7 +18,9 @@ class RobotDisplay:
     def __init__(self):
         self.ble_connection = BleConnection(self.handle_data)
         self.buffer = ""
-        self.arena = {}
+        self.arena = {"arena": arena.boundary_lines,}
+        self.wp_list = []
+        self.waypoints = None
         self.closed = False
         self.fig, self.axes = plt.subplots()
         self.pose_list = []
@@ -36,9 +39,8 @@ class RobotDisplay:
         self.buffer += data.decode()
         while "\n" in self.buffer:
             line, self.buffer = self.buffer.split("\n", 1)
-            # print(f"Received data: {line}")
             try:
-                # Print current time w/ seconds to 2 decimals
+                # Print current time w/ seconds (to hundredths)
                 now = datetime.now()
                 current_time = now.strftime("%H:%M:%S.%f")[:-4]
                 print(current_time)
@@ -49,11 +51,12 @@ class RobotDisplay:
             except ValueError:
                 print("Error parsing JSON")
                 return
-            if "arena" in message:
-                # print date and time
+            if "waypoints" in message:
+                # This is the first message sent from PicoBot
                 now = datetime.now()
-                print("Run started:", now)
-                self.arena = message
+                print("waypoints received from PicoBot", now)
+                self.wp_list = message["waypoints"]
+                self.waypoints = np.array(self.wp_list, dtype=np.float32)
             if "pose" in message:
                 pose = message["pose"]
                 self.pose_list.append(pose)
@@ -84,6 +87,8 @@ class RobotDisplay:
                 self.axes.plot(
                     [line[0][0], line[1][0]], [line[0][1], line[1][1]], color="black"
                 )
+        if self.waypoints is not None:
+            self.axes.scatter(self.waypoints[:,0], self.waypoints[:,1], color="magenta")
         if self.poses is not None:
             self.axes.scatter(self.poses[:,0], self.poses[:,1], color="blue")
         if self.r_pnts is not None:

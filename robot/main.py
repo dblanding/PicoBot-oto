@@ -29,7 +29,6 @@ import qwiic_otos
 import struct
 import time
 import VL53L0X
-import arena
 
 D_GAIN = 0.5  # Gain of Derivative feedback term
 
@@ -219,7 +218,7 @@ class Robot():
     def __init__(self):
 
         # set up some starting values
-        self.lin_spd = 0.4  # nominal drive speed
+        self.lin_spd = 0.7  # nominal drive speed
         self.ang_spd = 0  # prev value ang_spd only when stuck
         self.run = True
         self.mode = 'W'  # 'T' for tele-op, 'W' for auto (waypoints) 
@@ -368,7 +367,9 @@ async def command_handler(robot):
                 continue
             print("Received: ", request)
             if request["command"] == "arena":
-                send_json({"arena": arena.boundary_lines,})
+                print("Received request for waypoints")
+                print(waypoints)
+                send_json({"waypoints": waypoints})
             elif request["command"] == "start":
                 if not robot_task:
                     robot_task = asyncio.create_task(robot.main())
