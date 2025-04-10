@@ -61,14 +61,15 @@ replace the wheel odometry system I have been using, which relies on using motor
     
 ## Driving the car in Tele-Op mode.
 * After completing steps 1 through 4 above...
-     * Cick on the **Tele** button to enable Tele-op driving mode.
+    * Cick on the **Tele** button to enable Tele-op driving mode.
+    * Then click **Start**.
         * Now the PicoBot is ready to go. (The motors might sing briefly.)
-* Pick up the phone, being careful to keep it level..
-* The PicoBot is driven and steered by tipping and tilting the phone.
-    * Imagine there is a small ball on the face of the phone.
-    * Tipping the phone so the ball rolls away from you (toward the top) causes the robot to drive forward.
-    * Tilting the phone to the right or left causes the robot to turn right or left.
-    * Returning the phone to a level surface causes the robot to stop.
+    * Pick up the phone, being careful to keep it level..
+    * The PicoBot is driven and steered by tipping and tilting the phone.
+        * Imagine there is a small ball on the face of the phone.
+        * Tipping the phone so the ball rolls away from you (toward the top) causes the robot to drive forward.
+        * Tilting the phone to the right or left causes the robot to turn right or left.
+        * Returning the phone to a level surface causes the robot to stop.
 * Colored dots will be drawn on the map as the robot drives.
     * Blue dots show the path the robot has taken.
     * Red dots show the location of objects detected by the left distance sensor.
@@ -81,10 +82,11 @@ replace the wheel odometry system I have been using, which relies on using motor
 * You can null out any tendency to veer by adjusting the trim pot connected to the Pico's analog input (Pin 26). This adjustment has the effect of changing the relative magnitude of the signals sent to the R & L motors.
 
 ## Driving the car in Auto mode
-* Once the veering adjustment is made, the PicoBot can be driven in Auto mode  (automatically follow a series of waypoints).
+* Once the veer adjustment is done, the PicoBot can be driven in Auto mode  (automatically following a series of waypoints).
 * Start by repeating steps 1 - 4 in the **Running the Code** section above.
 * This time, Click on the **Auto** button at the top of the map window.
-* If everything is working perfectly, the robot will proceed to drive through the series of waypoints, mapping any obstacles detected along the way, ultimately arriving at the last waypoint, which happens to be its home (starting) position.
+* Then click **Start**.
+* If everything is working perfectly, the robot will proceed to drive through the series of waypoints, mapping any obstacles detected along the way, ultimately arriving at the last waypoint, which happens to be its starting (home) position.
 
 ![Loop_run](imgs/loop_map.png)
 
