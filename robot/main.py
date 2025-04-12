@@ -60,8 +60,8 @@ print("Device Addresses found on I2C0: ",i2c0.scan())
 # set up forward looking dist sensor on i2c1
 print("Device Addresses found on I2C1: ",i2c1.scan())
 i2c1 = I2C(1, sda=Pin(14), scl=Pin(15), freq=100000, timeout=200000 )
-tof1 = VL53L0X.VL53L0X(i2c1)
-tof1.start()
+tof_1 = VL53L0X.VL53L0X(i2c1)
+tof_1.start()
 
 # Initialize I2C1 using qwiic library
 my_bus = qwiic_i2c.get_i2c_driver(sda=14, scl=15, freq=100000)
@@ -124,18 +124,25 @@ def read_waypoints(wp_file):
                 waypoints.append(wp)
     return waypoints
 
-def get_dist(channel):
-    """
-    return dist (mm) from tof sensor on mux
-        channel = b'\x02'  # left sensor on ch 1
-        channel = b'\x04'  # right sensor on ch 2
-    see: https://github.com/mcauser/micropython-tca9548a
-    """
-    i2c0.writeto(0x70, channel)
+def set_up_snsr(sensor):
+    """Return tof"""
+    i2c0.writeto(0x70, sensor)
     tof = VL53L0X.VL53L0X(i2c0)
     tof.start()
+    return tof
+
+# set up 2 sensors on mux
+# see: https://github.com/mcauser/micropython-tca9548a
+ch1 = b'\x02'  # left sensor on ch 1
+tof1 = set_up_snsr(ch1)
+ch2 = b'\x04'  # right sensor on ch 2
+tof2 = set_up_snsr(ch2)
+
+def get_dist(tof, channel):
+    i2c0.writeto(0x70, channel)
     dist = tof.read()
     tof.stop()
+    i2c0.writeto(0x70, b'\x00')  # clear channels
     return dist
 
 def get_pose():
@@ -279,9 +286,9 @@ class Robot():
         try:
             while self.run:
                 # read distances from VCSEL sensors
-                dist_L = get_dist(b'\x02')
-                dist_R = get_dist(b'\x04')
-                dist_F = tof1.read()
+                dist_L = get_dist(tof1, ch1)
+                dist_R = get_dist(tof2, ch2)
+                dist_F = tof_1.read()
 
                 # check current pose
                 is_moving, pose = check_pose(self.prev_pose)
