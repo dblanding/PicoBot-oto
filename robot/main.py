@@ -347,7 +347,7 @@ class Robot():
                             "goal_dist": goal_dist,
                             "goal_angle": goal_angle,
                             })
-                    elif self.mote == 'T':
+                    elif self.mode == 'T':
                         send_json({
                             "pose": list(pose),
                             "dist_L": dist_L,
