@@ -8,19 +8,37 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Button
 from geom2d import pt_coords
 from robot_ble_connection import BleConnection
+import struct
 
 # Offset between sensor value and actual distance to robot center
 R_OFFSET = -14
 L_OFFSET = -5
 F_OFFSET = 33
 
+waypoints_file = "waypoints.txt"
+
+def read_waypoints(wp_file):
+    """Load waypoints from file"""
+    waypoints = []
+    with open(wp_file) as f:
+        lines = f.readlines()
+        for line in lines:
+            if ',' in line:
+                str_x, str_y = line.split(',')
+                wp = float(str_x), float(str_y)
+                waypoints.append(wp)
+    return waypoints
+
+waypoints = read_waypoints(waypoints_file)
+
+
 class RobotDisplay:
     def __init__(self):
         self.ble_connection = BleConnection(self.handle_data)
         self.buffer = ""
         self.arena = {"arena": arena.boundary_lines,}
-        self.wp_list = []
-        self.waypoints = None
+        self.wp_list = waypoints
+        self.waypoints = np.array(self.wp_list, dtype=np.float32)
         self.closed = False
         self.fig, self.axes = plt.subplots()
         self.pose_list = []
@@ -51,12 +69,16 @@ class RobotDisplay:
             except ValueError:
                 print("Error parsing JSON")
                 return
-            if "waypoints" in message:
+            if "wp_len" in message:  # robot reporting len(waypoints)
                 # This is the first message sent from PicoBot
                 now = datetime.now()
-                print("waypoints received from PicoBot", now)
-                self.wp_list = message["waypoints"]
-                self.waypoints = np.array(self.wp_list, dtype=np.float32)
+                correct_len = len(self.wp_list)
+                robot_len = message["wp_len"]
+                if robot_len == correct_len:
+                    print(f"All {correct_len} waypoints sent to robot", now)
+                else:
+                    print(f"Robot has {robot_len} points, should have {correct_len}")
+
             if "pose" in message:
                 pose = message["pose"]
                 self.pose_list.append(pose)
@@ -98,36 +120,43 @@ class RobotDisplay:
         if self.f_pnts is not None:
             self.axes.scatter(self.f_pnts[:,0], self.f_pnts[:,1], color="yellow")
         
+    async def send_waypoint(self, point):
+        wp_req = "!W".encode('utf8') + (json.dumps(point) + "\n").encode()
+        await self.ble_connection.send_uart_data(wp_req)
 
-    async def send_command(self, command):
-        request = (json.dumps({"command": command})  ).encode()
+    async def send_command(self, code):
+        request = (code + "\n").encode('utf8')
         print(f"Sending request: {request}")
         await self.ble_connection.send_uart_data(request)
 
-    def tele(self, _):
-        self.button_task = asyncio.create_task(self.send_command("tele"))
-
     def auto(self, _):
-        self.button_task = asyncio.create_task(self.send_command("auto"))
+        self.button_task = asyncio.create_task(self.send_command("!A"))
 
-    def start(self, _):
-        self.button_task = asyncio.create_task(self.send_command("start"))
+    def tele(self, _):
+        self.button_task = asyncio.create_task(self.send_command("!T"))
+
+    def run(self, _):
+        self.button_task = asyncio.create_task(self.send_command("!R"))
 
     def stop(self, _):
-        self.button_task = asyncio.create_task(self.send_command("stop"))
+        self.button_task = asyncio.create_task(self.send_command("!S"))
 
     async def main(self):
         plt.ion()
         await self.ble_connection.connect()
         try:
-            await self.send_command("arena")
+            print("Sending waypoints to robot")
+            for point in waypoints:
+                await self.send_waypoint(point)
+            print("Confirming receipt of all waypoints")
+            await self.send_command("!C")
             self.fig.canvas.mpl_connect("close_event", self.handle_close)
             tele_button = Button(plt.axes([0.2, 0.85, 0.1, 0.075]), "Tele")
             tele_button.on_clicked(self.tele)
             auto_button = Button(plt.axes([0.4, 0.85, 0.1, 0.075]), "Auto")
             auto_button.on_clicked(self.auto)
-            start_button = Button(plt.axes([0.6, 0.85, 0.1, 0.075]), "Start")
-            start_button.on_clicked(self.start)
+            run_button = Button(plt.axes([0.6, 0.85, 0.1, 0.075]), "Run")
+            run_button.on_clicked(self.run)
             stop_button = Button(plt.axes([0.8, 0.85, 0.1, 0.075]), "Stop")
             stop_button.on_clicked(self.stop)
             while not self.closed:

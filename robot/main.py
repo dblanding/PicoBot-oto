@@ -4,7 +4,7 @@ MicroPython code for PicoBot project
 * Raspberry Pi Pico mounted on differential drive robot
 * 56:1 gear motors
 * 2 BLE UART Friend modules
-* Tele-op driving commands come in on uart0
+* Tele-op driving commands (used to come in on uart0)
 * Robot data sent out to laptop on uart1
 * 2 VL53L0X tof distance sensors on I2C0: Left, Right
 * 1 VL53L0X tof distance sensor on I2C1: Forward
@@ -31,11 +31,10 @@ import time
 import VL53L0X
 
 D_GAIN = 0.5  # Gain of Derivative feedback term
-
-waypoints_file = "waypoints.txt"
+waypoints = []
 
 # set up uart0 for communication with BLE UART friend
-print("setting up uart0 for accepting tele-op joystick commands")
+print("setting up uart0 for BLE_UART_Friend")
 uart0 = UART(0, 9600)
 uart0.init(bits=8, parity=None, stop=1, timeout=10)
 
@@ -111,18 +110,6 @@ myOtos.setAngularUnit(myOtos.kAngularUnitRadians)
 myOtos.resetTracking()
 
 print("OTOS initialized")
-
-def read_waypoints(wp_file):
-    """Load waypoints from file"""
-    waypoints = []
-    with open(wp_file) as f:
-        lines = f.readlines()
-        for line in lines:
-            if ',' in line:
-                str_x, str_y = line.split(',')
-                wp = float(str_x), float(str_y)
-                waypoints.append(wp)
-    return waypoints
 
 def set_up_snsr(sensor):
     """Return tof"""
@@ -218,8 +205,6 @@ def rel_polar_coords_to_pt(curr_pose, point):
 
     return (r, rel_angle)
 
-# read waypoints file
-waypoints = read_waypoints(waypoints_file)
 
 class Robot():
     def __init__(self):
@@ -228,14 +213,14 @@ class Robot():
         self.lin_spd = 0.7  # nominal drive speed
         self.ang_spd = 0  # prev value ang_spd only when stuck
         self.run = True
-        self.mode = 'W'  # 'T' for tele-op, 'W' for auto (waypoints) 
+        self.mode = 'A'  # 'T' for tele-op, 'A' for auto (waypoints) 
         self.errors = []
         self.prev_pose = (0, 0, 0)
         self.wp_idx = 0  # index of first waypoint
 
     def auto(self):
         """Set mode to drive auto follow waypoints."""
-        self.mode = 'W'
+        self.mode = 'A'
 
     def tele(self):
         """Set mode to drive by tele-operation."""
@@ -300,10 +285,10 @@ class Robot():
 
                 # Drive in tele-op mode
                 if self.mode == 'T':
-                    if uart0.any() > 0:
+                    if uart1.any() > 0:
                         try:
                             # get Bluetooth command
-                            bytestring = uart0.readline()
+                            bytestring = uart1.readline()
                             data_type = bytestring[:2].decode()
                             bin_value = bytestring[2:14]
                             if data_type == '!A':  # accelerometer data
@@ -319,7 +304,7 @@ class Robot():
                         motors.drive_motors(self.lin_spd, self.ang_spd)
 
                 # Drive autonomously to sequence of waypoints
-                elif self.mode == 'W':
+                elif self.mode == 'A':
 
                     wp = waypoints[self.wp_idx]
                     goal_dist, goal_angle = rel_polar_coords_to_pt(pose, wp)
@@ -337,7 +322,7 @@ class Robot():
 
                 # If robot is moving, send robot data to laptop
                 if is_moving:
-                    if self.mode == 'W':
+                    if self.mode == 'A':
                         send_json({
                             "pose": list(pose),
                             "dist_L": dist_L,
@@ -369,24 +354,27 @@ async def command_handler(robot):
     # robot_task = asyncio.create_task(robot.main())
     while True:
         if uart1.any():
-            request = read_json()
-            if not request:
-                continue
-            print("Received: ", request)
-            if request["command"] == "arena":
-                print("Received request for waypoints")
-                print(waypoints)
-                send_json({"waypoints": waypoints})
-            elif request["command"] == "start":
-                if not robot_task:
-                    robot_task = asyncio.create_task(robot.main())
-            elif request["command"] == "stop":
-                robot.stop()
-            elif request["command"] == "auto":
-                robot.auto()
-            elif request["command"] == "tele":
-                robot.tele()
+            try:
+                # Handle Bluetooth request
+                bytestring = uart1.readline()
+                cmd = bytestring[:2].decode('utf8')
+                if cmd == '!W':
+                    point = json.loads(bytestring[2:])
+                    waypoints.append(point)
+                elif cmd == '!C':
+                    wp_len = len(waypoints)
+                    send_json({"wp_len": wp_len})
+                elif cmd == '!R':
+                    print("Received Run request, starting robot")
+                    if not robot_task:
+                        robot_task = asyncio.create_task(robot.main())
+                elif cmd == '!S':
+                    print("Received STOP request")
+                    robot.stop()
 
+            except Exception as e:
+                robot.errors.append(e)
+        
         await asyncio.sleep(0.1)
 
 
